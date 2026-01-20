@@ -3,70 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2026 尾牙座次查詢</title>
+    <title>嘉儀嘉年會-座位查詢</title>
     <style>
-        :root { --primary-color: #d32f2f; --bg-color: #f5f5f5; }
+        /* 定義藍色主題變數 */
+        :root { 
+            --primary-color: #1976d2; /* 深藍色 */
+            --secondary-color: #e3f2fd; /* 淺藍背景 */
+            --accent-color: #1565c0; 
+            --bg-color: #f0f4f8; 
+        }
+        
         body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg-color); margin: 0; padding: 15px; }
-        .container { max-width: 600px; margin: auto; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 20px; }
-        h2 { color: var(--primary-color); text-align: center; margin-top: 0; }
+        .container { max-width: 600px; margin: auto; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); padding: 20px; }
+        
+        h2 { color: var(--primary-color); text-align: center; margin-top: 0; border-bottom: 2px solid var(--secondary-color); padding-bottom: 15px; }
+        
+        /* 搜尋區塊 */
         .search-controls { display: flex; gap: 10px; margin-bottom: 20px; }
-        select, input { padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; outline: none; }
-        select { flex: 1; background: white; }
+        select, input { padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; outline: none; transition: 0.3s; }
+        select { flex: 1.2; background: white; cursor: pointer; }
         input { flex: 2; }
-        table { width: 100%; border-collapse: collapse; }
-        th { background: var(--primary-color); color: white; padding: 12px; }
-        td { padding: 12px; text-align: center; border-bottom: 1px solid #eee; }
-        .highlight { color: #d32f2f; font-weight: bold; }
+        select:focus, input:focus { border-color: var(--primary-color); box-shadow: 0 0 5px rgba(25, 118, 210, 0.2); }
+
+        /* 表格樣式 */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { background: var(--primary-color); color: white; padding: 12px; font-size: 15px; position: sticky; top: 0; }
+        td { padding: 12px; text-align: center; border-bottom: 1px solid #eee; font-size: 16px; color: #333; }
+        tr:nth-child(even) { background-color: var(--secondary-color); }
+        tr:hover { background-color: #bbdefb; }
+        
+        .highlight-table-num { color: var(--primary-color); font-weight: bold; font-size: 1.2em; }
+        .no-data { text-align: center; padding: 30px; color: #888; font-size: 16px; }
+        
+        /* 手機版微調 */
+        @media (max-width: 480px) {
+            .search-controls { flex-direction: column; }
+            select, input { width: 100%; }
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>🧧 尾牙座次查詢</h2>
+    <h2>💙 嘉儀嘉年會-座位查詢</h2>
+    
     <div class="search-controls">
         <select id="deptSelect" onchange="filterData()">
             <option value="">所有部門</option>
         </select>
-        <input type="text" id="nameSearch" placeholder="搜尋姓名..." oninput="filterData()">
+        <input type="text" id="nameSearch" placeholder="搜尋姓名 (輸入1字即可)..." oninput="filterData()">
     </div>
-    <div id="tableContainer">載入中...</div>
+
+    <div id="tableContainer">
+        <div class="no-data">資料讀取中...</div>
+    </div>
 </div>
 
 <script>
     let rawData = [];
 
-    // 從本地 json 檔案抓取資料
+    // 抓取 JSON 資料
     fetch('data.json')
         .then(response => response.json())
         .then(data => {
             rawData = data;
-            const depts = [...new Set(data.map(row => row[0]))].sort();
+            // 自動生成部門下拉清單
+            const depts = [...new Set(data.map(row => row[0]))].filter(d => d).sort();
             const select = document.getElementById('deptSelect');
             depts.forEach(d => {
                 let opt = document.createElement('option');
                 opt.value = d; opt.innerHTML = d;
                 select.appendChild(opt);
             });
-            filterData();
+            filterData(); // 初始渲染
+        })
+        .catch(err => {
+            document.getElementById('tableContainer').innerHTML = '<div class="no-data">無法讀取資料，請確認 data.json 是否正確。</div>';
         });
 
     function filterData() {
-        const dept = document.getElementById('deptSelect').value;
-        const name = document.getElementById('nameSearch').value.toLowerCase();
-        const filtered = rawData.filter(row => 
-            (dept === "" || row[0] === dept) && row[1].includes(name)
-        );
+        const selectedDept = document.getElementById('deptSelect').value;
+        const nameKey = document.getElementById('nameSearch').value.toLowerCase();
+        
+        const filtered = rawData.filter(row => {
+            const matchDept = selectedDept === "" || row[0] === selectedDept;
+            const matchName = row[1].toString().toLowerCase().includes(nameKey);
+            return matchDept && matchName;
+        });
+
         renderTable(filtered);
     }
 
     function renderTable(data) {
-        let html = '<table><tr><th>部門</th><th>姓名</th><th>桌次</th></tr>';
+        const container = document.getElementById('tableContainer');
+        if (data.length === 0) {
+            container.innerHTML = '<div class="no-data">🔍 查無符合條件的人員</div>';
+            return;
+        }
+
+        let html = '<table><thead><tr><th>部門</th><th>姓名</th><th>桌次</th></tr></thead><tbody>';
         data.forEach(row => {
-            html += `<tr><td>${row[0]}</td><td>${row[1]}</td><td class="highlight">${row[3]}</td></tr>`;
+            html += `<tr>
+                <td>${row[0]}</td>
+                <td>${row[1]}</td>
+                <td class="highlight-table-num">${row[3]}</td>
+            </tr>`;
         });
-        html += '</table>';
-        document.getElementById('tableContainer').innerHTML = data.length ? html : "查無資料";
+        html += '</tbody></table>';
+        container.innerHTML = html;
     }
 </script>
+
 </body>
 </html>
